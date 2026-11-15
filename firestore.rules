@@ -1,0 +1,457 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global safety net: default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isVerified() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isValidRankId(rankId) {
+      return rankId in [
+        'bronze',
+        'prata',
+        'ouro',
+        'diamante',
+        'platina',
+        'titanio',
+        'legend',
+        'supersonic-legend',
+        'champion',
+        'supersonic-champion'
+      ];
+    }
+
+    function isValidTurfId(turfId) {
+      return turfId in [
+        'classic',
+        'checker',
+        'street',
+        'neon',
+        'beach',
+        'futsal',
+        'clay',
+        'lava',
+        'frost',
+        'sakura',
+        'imperial',
+        'galaxy'
+      ];
+    }
+
+    function isValidHudOffset(off) {
+      return off is map
+        && off.keys().hasAll(['x', 'y'])
+        && off.keys().hasOnly(['x', 'y'])
+        && off.x is number && off.x >= -150 && off.x <= 150
+        && off.y is number && off.y >= -150 && off.y <= 150;
+    }
+
+    function isValidHudConfig(cfg) {
+      return cfg is map
+        && cfg.keys().hasAll(['layoutMode', 'handedness', 'buttonScale', 'joystickScale', 'opacity', 'offsets'])
+        && cfg.keys().hasOnly([
+          'layoutMode',
+          'handedness',
+          'showSwitchButton',
+          'buttonScale',
+          'joystickScale',
+          'joystickSensitivity',
+          'diagonalTolerance',
+          'opacity',
+          'offsets'
+        ])
+        && cfg.layoutMode in ['radial', 'split']
+        && cfg.handedness in ['left-joy', 'right-joy']
+        && (!('showSwitchButton' in cfg) || cfg.showSwitchButton is bool)
+        && cfg.buttonScale is number && cfg.buttonScale >= 0.75 && cfg.buttonScale <= 1.45
+        && cfg.joystickScale is number && cfg.joystickScale >= 0.75 && cfg.joystickScale <= 1.45
+        && (!('joystickSensitivity' in cfg) || (cfg.joystickSensitivity is number && cfg.joystickSensitivity >= 0.5 && cfg.joystickSensitivity <= 2.0))
+        && (!('diagonalTolerance' in cfg) || (cfg.diagonalTolerance is number && cfg.diagonalTolerance >= 0 && cfg.diagonalTolerance <= 400))
+        && cfg.opacity is number && cfg.opacity >= 0.35 && cfg.opacity <= 1.0
+        && cfg.offsets is map
+        && cfg.offsets.keys().hasAll(['joystick', 'sprint', 'dribble', 'pass', 'shoot'])
+        && cfg.offsets.keys().hasOnly(['joystick', 'sprint', 'dribble', 'pass', 'shoot', 'switch'])
+        && isValidHudOffset(cfg.offsets.joystick)
+        && isValidHudOffset(cfg.offsets.sprint)
+        && isValidHudOffset(cfg.offsets.dribble)
+        && isValidHudOffset(cfg.offsets.pass)
+        && isValidHudOffset(cfg.offsets.shoot)
+        && (!('switch' in cfg.offsets) || isValidHudOffset(cfg.offsets.switch));
+    }
+
+    function isValidCharacterConfig(cfg) {
+      return cfg is map
+        && cfg.keys().hasAll(['hairStyle', 'hairColor', 'jerseyPattern', 'auraTrail', 'cleatColor', 'jerseyNumber'])
+        && cfg.keys().hasOnly(['hairStyle', 'hairColor', 'jerseyPattern', 'auraTrail', 'cleatColor', 'jerseyNumber'])
+        && cfg.hairStyle in ['none', 'spiky', 'afro', 'mohawk', 'headband', 'crown', 'halo', 'horns']
+        && cfg.hairColor in ['#0F172A', '#FACC15', '#38BDF8', '#EF4444', '#EC4899', '#F8FAFC']
+        && cfg.jerseyPattern in ['solid', 'stripe', 'sash', 'star', 'flame']
+        && cfg.auraTrail in ['none', 'spark', 'flame', 'shadow', 'frost', 'ego']
+        && cfg.cleatColor in ['#F8FAFC', '#FBBF24', '#22D3EE', '#F43F5E', '#34D399']
+        && cfg.jerseyNumber is int && cfg.jerseyNumber >= 1 && cfg.jerseyNumber <= 99;
+    }
+
+    function isValidCosmeticsList(listVal) {
+      return listVal is list
+        && listVal.size() >= 1
+        && listVal.size() <= 35
+        && listVal.hasOnly([
+          'hair:none', 'hair:spiky', 'hair:headband', 'hair:afro', 'hair:mohawk', 'hair:horns', 'hair:halo', 'hair:crown',
+          'color:dark', 'color:gold', 'color:ego', 'color:crimson', 'color:neon', 'color:silver',
+          'pattern:solid', 'pattern:stripe', 'pattern:sash', 'pattern:star', 'pattern:flame',
+          'aura:none', 'aura:spark', 'aura:flame', 'aura:frost', 'aura:shadow', 'aura:ego',
+          'cleat:white', 'cleat:gold', 'cleat:cyan', 'cleat:crimson', 'cleat:emerald'
+        ]);
+    }
+
+    function isValidSkillsList(listVal, maxLen) {
+      return listVal is list
+        && listVal.size() <= maxLen
+        && listVal.hasOnly([
+          'phantom-dribble', 'thunder-pass', 'aerial-dominance',
+          'eagle-shot', 'godspeed', 'dragon-curve', 'bloodhound',
+          'shadow-step', 'meteor-strike', 'steal-master', 'cyclone-dribble',
+          'gravity-control', 'clone-feint', 'zero-angle', 'devils-touch',
+          'kings-awakening', 'overdrive', 'absolute-reflex', 'iron-wall', 'predator-vision'
+        ]);
+    }
+
+    function isValidAnimationsList(listVal) {
+      return listVal is list
+        && listVal.size() >= 2
+        && listVal.size() <= 12
+        && 'goal:classic' in listVal
+        && 'trail:standard' in listVal
+        && listVal.hasOnly([
+          'goal:classic', 'goal:fireworks', 'goal:lightning', 'goal:supernova', 'goal:matrix',
+          'trail:standard', 'trail:flame-dash', 'trail:frost-nova', 'trail:shadow-echo', 'trail:gold-aura'
+        ]);
+    }
+
+    function isValidAnimationConfig(cfg) {
+      return cfg is map
+        && cfg.keys().hasAll([
+          'goalAnimation',
+          'trailAnimation',
+          'fieldAnimDurationMs',
+          'lootboxAnimDurationMs',
+          'uiAnimDurationMs'
+        ])
+        && cfg.keys().hasOnly([
+          'goalAnimation',
+          'trailAnimation',
+          'fieldAnimDurationMs',
+          'lootboxAnimDurationMs',
+          'uiAnimDurationMs'
+        ])
+        && cfg.goalAnimation in ['classic', 'fireworks', 'lightning', 'supernova', 'matrix']
+        && cfg.trailAnimation in ['standard', 'flame-dash', 'frost-nova', 'shadow-echo', 'gold-aura']
+        && cfg.fieldAnimDurationMs is number && cfg.fieldAnimDurationMs >= 600 && cfg.fieldAnimDurationMs <= 3500
+        && cfg.lootboxAnimDurationMs is number && cfg.lootboxAnimDurationMs >= 0 && cfg.lootboxAnimDurationMs <= 2500
+        && cfg.uiAnimDurationMs is number && cfg.uiAnimDurationMs >= 0 && cfg.uiAnimDurationMs <= 800;
+    }
+
+    function isValidMenuConfig(cfg) {
+      return cfg is map
+        && cfg.keys().hasAll(['menuLayout', 'menuBackdropMode', 'showMenuRules', 'menuKeyboardNav'])
+        && cfg.keys().hasOnly(['menuLayout', 'menuBackdropMode', 'showMenuRules', 'menuKeyboardNav', 'menuAnimations'])
+        && cfg.menuLayout in ['default', 'compact']
+        && cfg.menuBackdropMode in ['stadium', 'minimal']
+        && cfg.showMenuRules is bool
+        && cfg.menuKeyboardNav is bool
+        && (!('menuAnimations' in cfg) || cfg.menuAnimations is bool);
+    }
+
+    function isValidPlayerSave(data) {
+      return data.keys().hasAll([
+          'uid',
+          'displayName',
+          'language',
+          'exp',
+          'rankId',
+          'coins',
+          'unlockedTurfs',
+          'selectedTurf',
+          'unlockedCosmetics',
+          'characterConfig',
+          'unlockedSkills',
+          'equippedSkills',
+          'unlockedAnimations',
+          'animationConfig',
+          'menuConfig',
+          'hudConfig',
+          'rankedWins',
+          'rankedLosses',
+          'rankedDraws',
+          'totalMatches',
+          'totalGoals',
+          'preferredMode',
+          'preferredTeamSize',
+          'muted',
+          'createdAt',
+          'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'uid',
+          'displayName',
+          'language',
+          'exp',
+          'rankId',
+          'coins',
+          'unlockedTurfs',
+          'selectedTurf',
+          'unlockedCosmetics',
+          'characterConfig',
+          'unlockedSkills',
+          'equippedSkills',
+          'unlockedAnimations',
+          'animationConfig',
+          'menuConfig',
+          'hudConfig',
+          'rankedWins',
+          'rankedLosses',
+          'rankedDraws',
+          'totalMatches',
+          'totalGoals',
+          'preferredMode',
+          'preferredTeamSize',
+          'muted',
+          'seasonNumber',
+          'createdAt',
+          'updatedAt'
+        ])
+        && isValidId(data.uid)
+        && data.uid == request.auth.uid
+        && data.displayName is string
+        && data.displayName.size() >= 1
+        && data.displayName.size() <= 16
+        && data.language in ['pt-BR', 'pt-PT', 'en-US', 'es']
+        && data.exp is number
+        && data.exp >= 0
+        && data.exp <= 1000000
+        && isValidRankId(data.rankId)
+        && data.coins is number && data.coins >= 0 && data.coins <= 10000000
+        && data.unlockedTurfs is list
+        && data.unlockedTurfs.size() >= 1
+        && data.unlockedTurfs.size() <= 12
+        && data.unlockedTurfs[0] is string
+        && 'classic' in data.unlockedTurfs
+        && data.unlockedTurfs.hasOnly([
+          'classic', 'checker', 'street', 'neon', 'beach', 'futsal',
+          'clay', 'lava', 'frost', 'sakura', 'imperial', 'galaxy'
+        ])
+        && isValidTurfId(data.selectedTurf)
+        && data.selectedTurf in data.unlockedTurfs
+        && isValidCosmeticsList(data.unlockedCosmetics)
+        && isValidCharacterConfig(data.characterConfig)
+        && isValidSkillsList(data.unlockedSkills, 20)
+        && isValidSkillsList(data.equippedSkills, 2)
+        && isValidAnimationsList(data.unlockedAnimations)
+        && isValidAnimationConfig(data.animationConfig)
+        && isValidMenuConfig(data.menuConfig)
+        && isValidHudConfig(data.hudConfig)
+        && data.rankedWins is number && data.rankedWins >= 0 && data.rankedWins <= 100000
+        && data.rankedLosses is number && data.rankedLosses >= 0 && data.rankedLosses <= 100000
+        && data.rankedDraws is number && data.rankedDraws >= 0 && data.rankedDraws <= 100000
+        && data.totalMatches is number && data.totalMatches >= 0 && data.totalMatches <= 500000
+        && data.totalGoals is number && data.totalGoals >= 0 && data.totalGoals <= 1000000
+        && data.preferredMode in ['1p', '2p', 'training', 'online']
+        && data.preferredTeamSize in [1, 2, 4, 8, 16]
+        && data.muted is bool
+        && (!('seasonNumber' in data) || (data.seasonNumber is int && data.seasonNumber >= 1 && data.seasonNumber <= 100000))
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidMatchRecord(data) {
+      return data.keys().hasAll([
+          'uid',
+          'mode',
+          'isRanked',
+          'teamSize',
+          'blueScore',
+          'redScore',
+          'result',
+          'expDelta',
+          'rankAfter',
+          'createdAt'
+        ])
+        && data.keys().hasOnly([
+          'uid',
+          'mode',
+          'isRanked',
+          'teamSize',
+          'blueScore',
+          'redScore',
+          'result',
+          'expDelta',
+          'rankAfter',
+          'createdAt'
+        ])
+        && isValidId(data.uid)
+        && data.uid == request.auth.uid
+        && data.mode in ['1p', '2p', 'training', 'online']
+        && data.isRanked is bool
+        && data.teamSize in [1, 2, 4, 8, 16]
+        && data.blueScore is number && data.blueScore >= 0 && data.blueScore <= 99
+        && data.redScore is number && data.redScore >= 0 && data.redScore <= 99
+        && data.result in ['win', 'loss', 'draw']
+        && data.expDelta is number && data.expDelta >= -200 && data.expDelta <= 500
+        && isValidRankId(data.rankAfter)
+        && data.createdAt is timestamp;
+    }
+
+    function isValidLeaderboardEntry(data) {
+      return data.keys().hasAll([
+          'uid',
+          'displayName',
+          'exp',
+          'rankId',
+          'rankedWins',
+          'rankedMatches',
+          'totalGoals',
+          'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'uid',
+          'displayName',
+          'exp',
+          'rankId',
+          'rankedWins',
+          'rankedMatches',
+          'totalGoals',
+          'seasonNumber',
+          'updatedAt'
+        ])
+        && isValidId(data.uid)
+        && data.uid == request.auth.uid
+        && data.displayName is string
+        && data.displayName.size() >= 1
+        && data.displayName.size() <= 16
+        && data.exp is number && data.exp >= 0 && data.exp <= 1000000
+        && isValidRankId(data.rankId)
+        && data.rankedWins is number && data.rankedWins >= 0 && data.rankedWins <= 100000
+        && data.rankedMatches is number && data.rankedMatches >= 0 && data.rankedMatches <= 500000
+        && data.totalGoals is number && data.totalGoals >= 0 && data.totalGoals <= 1000000
+        && (!('seasonNumber' in data) || (data.seasonNumber is int && data.seasonNumber >= 1 && data.seasonNumber <= 100000))
+        && data.updatedAt is timestamp;
+    }
+
+    match /saves/{userId} {
+      allow get: if isValidId(userId) && isOwner(userId);
+      allow list: if false;
+      allow create: if isValidId(userId)
+        && isOwner(userId)
+        && isVerified()
+        && isValidPlayerSave(incoming())
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isValidId(userId)
+        && isOwner(userId)
+        && isVerified()
+        && isValidPlayerSave(incoming())
+        && incoming().uid == existing().uid
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly([
+          'displayName',
+          'language',
+          'exp',
+          'rankId',
+          'coins',
+          'unlockedTurfs',
+          'selectedTurf',
+          'unlockedCosmetics',
+          'characterConfig',
+          'unlockedSkills',
+          'equippedSkills',
+          'unlockedAnimations',
+          'animationConfig',
+          'menuConfig',
+          'hudConfig',
+          'rankedWins',
+          'rankedLosses',
+          'rankedDraws',
+          'totalMatches',
+          'totalGoals',
+          'preferredMode',
+          'preferredTeamSize',
+          'muted',
+          'seasonNumber',
+          'updatedAt'
+        ]);
+      allow delete: if false;
+
+      match /matches/{matchId} {
+        allow get: if isValidId(userId)
+          && isValidId(matchId)
+          && isOwner(userId)
+          && get(/databases/$(database)/documents/saves/$(userId)).data.uid == request.auth.uid;
+        allow list: if isValidId(userId)
+          && isOwner(userId)
+          && resource.data.uid == request.auth.uid;
+        allow create: if isValidId(userId)
+          && isValidId(matchId)
+          && isOwner(userId)
+          && isVerified()
+          && isValidMatchRecord(incoming())
+          && incoming().createdAt == request.time
+          && exists(/databases/$(database)/documents/saves/$(userId));
+        allow update, delete: if false;
+      }
+    }
+
+    match /leaderboard/{userId} {
+      allow get: if isValidId(userId);
+      allow list: if resource.data.exp >= 0;
+      allow create: if isValidId(userId)
+        && isOwner(userId)
+        && isVerified()
+        && isValidLeaderboardEntry(incoming())
+        && incoming().updatedAt == request.time;
+      allow update: if isValidId(userId)
+        && isOwner(userId)
+        && isVerified()
+        && isValidLeaderboardEntry(incoming())
+        && incoming().uid == existing().uid
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly([
+          'displayName',
+          'exp',
+          'rankId',
+          'rankedWins',
+          'rankedMatches',
+          'totalGoals',
+          'seasonNumber',
+          'updatedAt'
+        ]);
+      allow delete: if false;
+    }
+  }
+}

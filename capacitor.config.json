@@ -1,0 +1,15 @@
+{
+  "appId": "com.arenafutebol.app",
+  "appName": "Arena Futebol",
+  "webDir": "dist",
+  "bundledWebRuntime": false,
+  "android": {
+    "allowMixedContent": true,
+    "backgroundColor": "#0B1215"
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 0
+    }
+  }
+}
