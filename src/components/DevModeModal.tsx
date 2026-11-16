@@ -67,6 +67,7 @@ export const DevModeModal: React.FC<DevModeModalProps> = ({
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [expInput, setExpInput] = useState(String(currentExp));
   const [savedNotice, setSavedNotice] = useState<string | null>(null);
+  const [isCheckingPassword, setIsCheckingPassword] = useState(false);
 
   useEffect(() => {
     if (open) {
@@ -77,8 +78,6 @@ export const DevModeModal: React.FC<DevModeModalProps> = ({
   if (!open) return null;
 
   const isOnlineMatch = isPlaying && gameMode === 'online';
-
-  const [isCheckingPassword, setIsCheckingPassword] = useState(false);
 
   const handlePasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
