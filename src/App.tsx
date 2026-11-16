@@ -1465,18 +1465,33 @@ export default function App() {
     resolveKeyboardWithDiagonalTolerance,
   ]);
 
+  // Closing Developer Mode also ends the local authorization session.
+  // Reopening it always requires the developer password again.
+  const closeDevMode = () => {
+    setDevModalOpen(false);
+    setDevUnlocked(false);
+    devTokenRef.current = null;
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({ type: 'dev_auth', token: '' }));
+    }
+  };
+
   // Global Developer Mode shortcut (Ctrl+Shift+Alt+D) + Escape close
   useEffect(() => {
     const onGlobalKey = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.altKey && e.code === 'KeyD') {
         e.preventDefault();
         keysPressedRef.current.clear();
-        setDevModalOpen((prev) => !prev);
+        if (devModalOpen) {
+          closeDevMode();
+        } else {
+          setDevModalOpen(true);
+        }
         return;
       }
       if (e.code === 'Escape' && devModalOpen) {
         e.preventDefault();
-        setDevModalOpen(false);
+        closeDevMode();
         return;
       }
       if (e.code === 'Escape' && matchSkillPicker.open) {
