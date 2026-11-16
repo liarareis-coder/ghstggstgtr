@@ -4,6 +4,9 @@ import {
   GoogleAuthProvider,
   onAuthStateChanged,
   signInWithPopup,
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  sendPasswordResetEmail,
   signOut,
   type User,
 } from 'firebase/auth';
@@ -132,6 +135,20 @@ export async function signInWithGoogle(): Promise<User> {
   provider.setCustomParameters({ prompt: 'select_account' });
   const cred = await signInWithPopup(auth, provider);
   return cred.user;
+}
+
+export async function signInWithEmail(email: string, password: string): Promise<User> {
+  const credential = await signInWithEmailAndPassword(auth, email.trim(), password);
+  return credential.user;
+}
+
+export async function createEmailAccount(email: string, password: string): Promise<User> {
+  const credential = await createUserWithEmailAndPassword(auth, email.trim(), password);
+  return credential.user;
+}
+
+export async function sendPasswordReset(email: string): Promise<void> {
+  await sendPasswordResetEmail(auth, email.trim());
 }
 
 export async function signOutUser(): Promise<void> {

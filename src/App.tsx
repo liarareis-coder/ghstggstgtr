@@ -58,6 +58,9 @@ import {
   loadCloudSave,
   recordCloudMatch,
   signInWithGoogle,
+  signInWithEmail,
+  createEmailAccount,
+  sendPasswordReset,
   signOutUser,
   subscribeAuth,
   writeCloudSave,
@@ -1032,6 +1035,36 @@ export default function App() {
       showSaveToast(t.saveFeedbackSynced);
     } catch (err) {
       console.error(err);
+    } finally {
+      setCloudBusy(false);
+    }
+  };
+
+  const handleSignInEmail = async (email: string, password: string) => {
+    setCloudBusy(true);
+    try {
+      await signInWithEmail(email, password);
+      showSaveToast(t.saveFeedbackSynced);
+    } finally {
+      setCloudBusy(false);
+    }
+  };
+
+  const handleCreateEmailAccount = async (email: string, password: string) => {
+    setCloudBusy(true);
+    try {
+      await createEmailAccount(email, password);
+      showSaveToast(t.saveFeedbackSynced);
+    } finally {
+      setCloudBusy(false);
+    }
+  };
+
+  const handlePasswordReset = async (email: string) => {
+    setCloudBusy(true);
+    try {
+      await sendPasswordReset(email);
+      showSaveToast('E-mail de recuperação enviado. Confira sua caixa de entrada.');
     } finally {
       setCloudBusy(false);
     }
@@ -2663,6 +2696,9 @@ export default function App() {
       user={firebaseUser}
       cloudBusy={cloudBusy}
       onSignInGoogle={handleSignInGoogle}
+      onSignInEmail={handleSignInEmail}
+      onCreateEmailAccount={handleCreateEmailAccount}
+      onPasswordReset={handlePasswordReset}
       onSignOutGoogle={handleSignOutGoogle}
       onSyncCloud={handleSyncCloudNow}
       leaderboard={leaderboard}

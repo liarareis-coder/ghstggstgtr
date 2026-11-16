@@ -58,6 +58,9 @@ import {
   loadCloudSave,
   recordCloudMatch,
   signInWithGoogle,
+  signInWithEmail,
+  createEmailAccount,
+  sendPasswordReset,
   signOutUser,
   subscribeAuth,
   writeCloudSave,
@@ -1037,6 +1040,36 @@ export default function App() {
     }
   };
 
+  const handleSignInEmail = async (email: string, password: string) => {
+    setCloudBusy(true);
+    try {
+      await signInWithEmail(email, password);
+      showSaveToast(t.saveFeedbackSynced);
+    } finally {
+      setCloudBusy(false);
+    }
+  };
+
+  const handleCreateEmailAccount = async (email: string, password: string) => {
+    setCloudBusy(true);
+    try {
+      await createEmailAccount(email, password);
+      showSaveToast(t.saveFeedbackSynced);
+    } finally {
+      setCloudBusy(false);
+    }
+  };
+
+  const handlePasswordReset = async (email: string) => {
+    setCloudBusy(true);
+    try {
+      await sendPasswordReset(email);
+      showSaveToast('E-mail de recuperação enviado. Confira sua caixa de entrada.');
+    } finally {
+      setCloudBusy(false);
+    }
+  };
+
   const handleSignOutGoogle = async () => {
     setCloudBusy(true);
     try {
@@ -1465,18 +1498,33 @@ export default function App() {
     resolveKeyboardWithDiagonalTolerance,
   ]);
 
+  // Closing Developer Mode also ends the local authorization session.
+  // Reopening it always requires the developer password again.
+  const closeDevMode = () => {
+    setDevModalOpen(false);
+    setDevUnlocked(false);
+    devTokenRef.current = null;
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({ type: 'dev_auth', token: '' }));
+    }
+  };
+
   // Global Developer Mode shortcut (Ctrl+Shift+Alt+D) + Escape close
   useEffect(() => {
     const onGlobalKey = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.altKey && e.code === 'KeyD') {
         e.preventDefault();
         keysPressedRef.current.clear();
-        setDevModalOpen((prev) => !prev);
+        if (devModalOpen) {
+          closeDevMode();
+        } else {
+          setDevModalOpen(true);
+        }
         return;
       }
       if (e.code === 'Escape' && devModalOpen) {
         e.preventDefault();
-        setDevModalOpen(false);
+        closeDevMode();
         return;
       }
       if (e.code === 'Escape' && matchSkillPicker.open) {
@@ -2648,6 +2696,9 @@ export default function App() {
       user={firebaseUser}
       cloudBusy={cloudBusy}
       onSignInGoogle={handleSignInGoogle}
+      onSignInEmail={handleSignInEmail}
+      onCreateEmailAccount={handleCreateEmailAccount}
+      onPasswordReset={handlePasswordReset}
       onSignOutGoogle={handleSignOutGoogle}
       onSyncCloud={handleSyncCloudNow}
       leaderboard={leaderboard}
